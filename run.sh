@@ -1,0 +1,1 @@
+ python visualize.py --device 'cuda:4' --scene "drums" --factor 2 --visualize_depth --visualize_normals
