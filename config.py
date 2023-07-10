@@ -54,6 +54,8 @@ def get_config():
     config.add_argument("--grid_size", type=int, default=256)
     config.add_argument("--sigma_threshold", type=float, default=50.0)
     config.add_argument("--occ_threshold", type=float, default=0.2)
+    # new things
+    config.add_argument("--use_realpos", action="store_false")
 
     config = config.parse_args()
 
@@ -71,6 +73,9 @@ def get_config():
     elif config.dataset_name == "multicam":
         base_data_path = "../../dataset/nerf_multiscale/"
     config.base_dir = path.join(base_data_path, config.scene)
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
-    config.model_weight_path=config.log_dir+'model.pt'
+    if config.use_realpos:
+        config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_rp' + '/'
+    else:
+        config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
+    config.model_weight_path = config.log_dir + 'model.pt'
     return config

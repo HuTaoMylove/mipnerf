@@ -17,10 +17,11 @@ class PositionalEncoding(nn.Module):
         x_enc = torch.cat((x_enc, x_enc + 0.5 * torch.pi), -1)
         if y is not None:
             # IPE
-            y_enc = (y[..., None, :] * self.scales[:, None]**2).reshape(shape)
+            y_enc = (y[..., None, :] * self.scales[:, None] ** 2).reshape(shape)
             y_enc = torch.cat((y_enc, y_enc), -1)
             x_ret = torch.exp(-0.5 * y_enc) * torch.sin(x_enc)
-            y_ret = torch.maximum(torch.zeros_like(y_enc), 0.5 * (1 - torch.exp(-2 * y_enc) * torch.cos(2 * x_enc)) - x_ret ** 2)
+            y_ret = torch.maximum(torch.zeros_like(y_enc),
+                                  0.5 * (1 - torch.exp(-2 * y_enc) * torch.cos(2 * x_enc)) - x_ret ** 2)
             return x_ret, y_ret
         else:
             # PE
@@ -46,7 +47,8 @@ class MipNeRF(nn.Module):
                  viewdirs_min_deg=0,
                  viewdirs_max_deg=4,
                  device=torch.device("cpu"),
-                 return_raw=False
+                 return_raw=False,
+                 use_realpos=False
                  ):
         super(MipNeRF, self).__init__()
         self.use_viewdirs = use_viewdirs
@@ -66,6 +68,9 @@ class MipNeRF(nn.Module):
         self.device = device
         self.return_raw = return_raw
         self.density_activation = nn.Softplus()
+
+        if use_realpos:
+            self.density_input += 4
 
         self.positional_encoding = PositionalEncoding(min_deg, max_deg)
         self.density_net0 = nn.Sequential(
@@ -129,6 +134,9 @@ class MipNeRF(nn.Module):
                                                           ray_shape=self.ray_shape)
             # do integrated positional encoding of samples
             samples_enc = self.positional_encoding(mean, var)[0]
+            samples_enc = torch.cat(
+                [torch.nn.functional.normalize(mean, dim=-1), (1 / (torch.norm(mean, dim=-1, keepdim=True))).clip(0, 1),
+                 samples_enc], dim=-1)
             samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
 
             # predict density
@@ -151,12 +159,15 @@ class MipNeRF(nn.Module):
 
             # Add noise to regularize the density predictions if needed.
             if self.randomized and self.density_noise:
-                raw_density += self.density_noise * torch.rand(raw_density.shape, dtype=raw_density.dtype, device=raw_density.device)
+                raw_density += self.density_noise * torch.rand(raw_density.shape, dtype=raw_density.dtype,
+                                                               device=raw_density.device)
 
             # volumetric rendering
             rgb = raw_rgb * (1 + 2 * self.rgb_padding) - self.rgb_padding
             density = self.density_activation(raw_density + self.density_bias)
-            comp_rgb, distance, acc, weights, alpha = volumetric_rendering(rgb, density, t_vals, rays.directions.to(rgb.device), self.white_bkgd)
+            comp_rgb, distance, acc, weights, alpha = volumetric_rendering(rgb, density, t_vals,
+                                                                           rays.directions.to(rgb.device),
+                                                                           self.white_bkgd)
             comp_rgbs.append(comp_rgb)
             distances.append(distance)
             accs.append(acc)
@@ -181,7 +192,7 @@ class MipNeRF(nn.Module):
         with torch.no_grad():
             for i in range(0, length, chunks):
                 # put chunk of rays on device
-                chunk_rays = namedtuple_map(lambda r: r[i:i+chunks].to(self.device), rays)
+                chunk_rays = namedtuple_map(lambda r: r[i:i + chunks].to(self.device), rays)
                 rgb, distance, acc = self(chunk_rays)
                 rgbs.append(rgb[-1].cpu())
                 dists.append(distance[-1].cpu())
@@ -190,6 +201,37 @@ class MipNeRF(nn.Module):
         rgbs = to8b(torch.cat(rgbs, dim=0).reshape(height, width, 3).numpy())
         dists = torch.cat(dists, dim=0).reshape(height, width).numpy()
         accs = torch.cat(accs, dim=0).reshape(height, width).numpy()
+        return rgbs, dists, accs
+
+    def render_image_cv(self, rays, height, width, chunks=8192):
+        """
+        Return image, disparity map, accumulated opacity (shaped to height x width) created using rays as input.
+        Rays should be all of the rays that correspond to this one single image.
+        Batches the rays into chunks to not overload memory of device
+        """
+        length = rays[0].shape[0]
+        rgbs = []
+        dists = []
+        accs = []
+        with torch.no_grad():
+            for i in range(0, length, chunks):
+                # put chunk of rays on device
+                chunk_rays = namedtuple_map(lambda r: r[i:i + chunks].to(self.device), rays)
+                rgb, distance, acc = self(chunk_rays)
+                rgbs.append(rgb[-1].cpu())
+                dists.append(distance[-1].cpu())
+                accs.append(acc[-1].cpu())
+        rgbs = torch.cat(rgbs, dim=0).reshape(height, width, 3).permute(2, 0, 1).reshape(-1, 3, height, width)
+        rgbs = torch.nn.functional.upsample(rgbs, [800, 800],
+                                            mode='bilinear').reshape(3, 800, 800).permute(1, 2, 0)
+        rgbs = torch.cat(
+            [rgbs[..., -1].reshape(800, 800, 1), rgbs[..., 1].reshape(800, 800, 1), rgbs[..., 0].reshape(800, 800, 1)],
+            dim=-1)
+        rgbs = to8b(rgbs.numpy())
+        dists = torch.nn.functional.upsample(torch.cat(dists, dim=0).reshape(1, 1, height, width), [800, 800],
+                                             mode='bilinear').reshape(800, 800).numpy()
+        accs = torch.nn.functional.upsample(torch.cat(accs, dim=0).reshape(1, 1, height, width), [800, 800],
+                                            mode='bilinear').reshape(800, 800).numpy()
         return rgbs, dists, accs
 
     def train(self, mode=True):
