@@ -1,1 +1,1 @@
- python visualize.py --device 'cuda:4' --scene "materials" --factor 2 --visualize_depth --visualize_normals
+python train.py --device 'cuda:2' --scene "chair"

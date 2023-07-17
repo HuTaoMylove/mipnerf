@@ -68,7 +68,8 @@ class MipNeRF(nn.Module):
         self.device = device
         self.return_raw = return_raw
         self.density_activation = nn.Softplus()
-
+        self.use_realpos=use_realpos
+        
         if use_realpos:
             self.density_input += 4
 
@@ -134,9 +135,11 @@ class MipNeRF(nn.Module):
                                                           ray_shape=self.ray_shape)
             # do integrated positional encoding of samples
             samples_enc = self.positional_encoding(mean, var)[0]
-            samples_enc = torch.cat(
-                [torch.nn.functional.normalize(mean, dim=-1), (1 / (torch.norm(mean, dim=-1, keepdim=True))).clip(0, 1),
-                 samples_enc], dim=-1)
+            if self.use_realpos:
+                samples_enc = torch.cat(
+                    [torch.nn.functional.normalize(mean, dim=-1),
+                     (1 / (torch.norm(mean, dim=-1, keepdim=True))).clip(0, 1),samples_enc], 
+                     dim=-1)
             samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
 
             # predict density

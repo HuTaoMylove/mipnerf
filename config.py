@@ -55,7 +55,7 @@ def get_config():
     config.add_argument("--sigma_threshold", type=float, default=50.0)
     config.add_argument("--occ_threshold", type=float, default=0.2)
     # new things
-    config.add_argument("--use_realpos", action="store_false")
+    config.add_argument("--use_realpos", action="store_true")
 
     config = config.parse_args()
 

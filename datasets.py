@@ -37,7 +37,7 @@ def cycle(iterable):
 
 
 class NeRFDataset(Dataset):
-    def __init__(self, base_dir, split, spherify=False, near=2, far=6, white_bkgd=False, factor=1, n_poses=120, radius=None, radii=None, h=None, w=None, device=torch.device("cpu")):
+    def __init__(self, base_dir, split, spherify=False, near=2, far=10, white_bkgd=False, factor=1, n_poses=120, radius=None, radii=None, h=None, w=None, device=torch.device("cpu")):
         super(Dataset, self).__init__()
         self.base_dir = base_dir
         self.split = split
