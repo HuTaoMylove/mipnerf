@@ -47,8 +47,7 @@ class MipNeRF(nn.Module):
                  viewdirs_min_deg=0,
                  viewdirs_max_deg=4,
                  device=torch.device("cpu"),
-                 return_raw=False,
-                 use_realpos=False
+                 return_raw=False
                  ):
         super(MipNeRF, self).__init__()
         self.use_viewdirs = use_viewdirs
@@ -68,11 +67,6 @@ class MipNeRF(nn.Module):
         self.device = device
         self.return_raw = return_raw
         self.density_activation = nn.Softplus()
-        self.use_realpos=use_realpos
-        
-        if use_realpos:
-            self.density_input += 4
-
         self.positional_encoding = PositionalEncoding(min_deg, max_deg)
         self.density_net0 = nn.Sequential(
             nn.Linear(self.density_input, hidden),
@@ -135,11 +129,6 @@ class MipNeRF(nn.Module):
                                                           ray_shape=self.ray_shape)
             # do integrated positional encoding of samples
             samples_enc = self.positional_encoding(mean, var)[0]
-            if self.use_realpos:
-                samples_enc = torch.cat(
-                    [torch.nn.functional.normalize(mean, dim=-1),
-                     (1 / (torch.norm(mean, dim=-1, keepdim=True))).clip(0, 1),samples_enc], 
-                     dim=-1)
             samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
 
             # predict density

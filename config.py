@@ -8,8 +8,8 @@ def get_config():
 
     # basic hyperparams to specify where to load/save data from/to
     config.add_argument("--log_dir", type=str, default="log")
-    config.add_argument("--dataset_name", type=str, default="blender")
-    config.add_argument("--scene", type=str, default="lego")
+    config.add_argument("--dataset_name", type=str, default="nerf360")
+    config.add_argument("--scene", type=str, default="bicycle")
     # model hyperparams
     config.add_argument("--use_viewdirs", action="store_false")
     config.add_argument("--randomized", action="store_false")
@@ -35,13 +35,13 @@ def get_config():
     config.add_argument("--lr_delay_mult", type=float, default=0.1)
     config.add_argument("--weight_decay", type=float, default=1e-5)
     # training hyperparams
-    config.add_argument("--factor", type=int, default=2)
+    config.add_argument("--factor", type=int, default=8)
     config.add_argument("--max_steps", type=int, default=200_000)
     config.add_argument("--batch_size", type=int, default=2048)
     config.add_argument("--do_eval", action="store_false")
     config.add_argument("--continue_training", action="store_true")
     config.add_argument("--save_every", type=int, default=1000)
-    config.add_argument("--device", type=str, default="cuda")
+    config.add_argument("--device", type=str, default="cpu")
     # visualization hyperparams
     config.add_argument("--chunks", type=int, default=8192)
     config.add_argument("--model_weight_path", default="log/model.pt")
@@ -54,8 +54,6 @@ def get_config():
     config.add_argument("--grid_size", type=int, default=256)
     config.add_argument("--sigma_threshold", type=float, default=50.0)
     config.add_argument("--occ_threshold", type=float, default=0.2)
-    # new things
-    config.add_argument("--use_realpos", action="store_true")
 
     config = config.parse_args()
 
@@ -70,12 +68,9 @@ def get_config():
     base_data_path = "../../dataset/nerf_llff_data/"
     if config.dataset_name == "blender":
         base_data_path = "../../dataset/nerf_synthetic/"
-    elif config.dataset_name == "multicam":
-        base_data_path = "../../dataset/nerf_multiscale/"
+    elif config.dataset_name == "nerf360":
+        base_data_path = "../../dataset/nerf360/"
     config.base_dir = path.join(base_data_path, config.scene)
-    if config.use_realpos:
-        config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_rp' + '/'
-    else:
-        config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
     config.model_weight_path = config.log_dir + 'model.pt'
     return config
