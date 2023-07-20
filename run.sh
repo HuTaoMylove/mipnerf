@@ -1,1 +1,1 @@
-python train.py --device 'cuda:2' --scene "chair"
+python visualize.py --device 'cuda:3' --dataset_name "nerf360" --scene "bicycle" --factor 8 --visualize_depth --visualize_normals --white_bkgd
