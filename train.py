@@ -19,10 +19,10 @@ def train_model(config):
     model_save_path = path.join(config.log_dir, "model.pt")
     optimizer_save_path = path.join(config.log_dir, "optim.pt")
 
-    data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device)))
+    data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device,config=config)))
     eval_data = None
     if config.do_eval:
-        eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device)))
+        eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device,config=config)))
 
     model = MipNeRF(
         use_viewdirs=config.use_viewdirs,

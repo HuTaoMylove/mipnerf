@@ -42,6 +42,7 @@ def get_config():
     config.add_argument("--continue_training", action="store_true")
     config.add_argument("--save_every", type=int, default=1000)
     config.add_argument("--device", type=str, default="cpu")
+    config.add_argument("--norm", type=str, default="min", help='bds normalize')
     # visualization hyperparams
     config.add_argument("--chunks", type=int, default=8192)
     config.add_argument("--model_weight_path", default="log/model.pt")

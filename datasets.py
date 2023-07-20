@@ -11,13 +11,14 @@ from pose_utils import normalize, look_at, poses_avg, recenter_poses, to_float, 
 from torch.utils.data import Dataset, DataLoader
 
 
-def get_dataset(dataset_name, base_dir, split, factor=4, device=torch.device("cpu")):
-    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device)
+def get_dataset(dataset_name, base_dir, split, factor=4, device=torch.device("cpu"), config=None):
+    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device, config=None)
     return d
 
 
-def get_dataloader(dataset_name, base_dir, split, factor=4, batch_size=None, shuffle=True, device=torch.device("cpu")):
-    d = get_dataset(dataset_name, base_dir, split, factor, device)
+def get_dataloader(dataset_name, base_dir, split, factor=4, batch_size=None, shuffle=True, device=torch.device("cpu"),
+                   config=None):
+    d = get_dataset(dataset_name, base_dir, split, factor, device, config)
     # make the batchsize height*width, so that one "batch" from the dataloader corresponds to one
     # image used to render a video, and don't shuffle dataset
     if split == "render":
@@ -180,7 +181,7 @@ class Blender(NeRFDataset):
     """Blender Dataset."""
 
     def __init__(self, base_dir, split, factor=1, spherify=True, white_bkgd=True, near=2, far=6, radius=4, radii=1,
-                 h=800, w=800, device=torch.device("cpu")):
+                 h=800, w=800, device=torch.device("cpu"), config=None):
         super(Blender, self).__init__(base_dir, split, factor=factor, spherify=spherify, near=near, far=far,
                                       white_bkgd=white_bkgd, radius=radius, radii=radii, h=h, w=w, device=device)
 
@@ -238,7 +239,8 @@ class Blender(NeRFDataset):
 
 
 class LLFF(NeRFDataset):
-    def __init__(self, base_dir, split, factor=4, spherify=False, white_bkgd=False, device=torch.device("cpu")):
+    def __init__(self, base_dir, split, factor=4, spherify=False, white_bkgd=False, device=torch.device("cpu"),
+                 config=None):
         super(LLFF, self).__init__(base_dir, split, spherify=spherify, white_bkgd=white_bkgd, factor=factor,
                                    device=device)
 
@@ -422,9 +424,10 @@ class LLFF(NeRFDataset):
 
 class nerf360(NeRFDataset):
     def __init__(self, base_dir, split, factor=4, spherify=True, near=None, far=None, white_bkgd=False,
-                 device=torch.device("cpu")):
+                 device=torch.device("cpu"), config=None):
         super(nerf360, self).__init__(base_dir, split, spherify=spherify, near=near, far=far, white_bkgd=white_bkgd,
                                       factor=factor, device=device)
+        self.config = config
 
     def generate_training_poses(self):
         """Load data from disk"""
@@ -459,7 +462,10 @@ class nerf360(NeRFDataset):
         self.images = images
         bds = np.moveaxis(bds, -1, 0).astype(np.float32)
         # Rescale according to a default bd factor.
-        scale = 1. / (bds.min() * .75)
+        if self.config.norm == 'max':
+            scale = 1. / (bds.max() * .75)
+        else:
+            scale = 1. / (bds.min() * .75)
         poses[:, :3, 3] *= scale
         bds *= scale
         # Recenter poses.
@@ -473,10 +479,15 @@ class nerf360(NeRFDataset):
     def generate_render_poses(self):
         self.generate_training_poses()
         self.n_poses = self.n_poses_copy  # get overwritten in generate_training_poses, change back to original
-        if self.spherify:
-            self.generate_spherical_poses(self.n_poses)
-        else:
-            self.generate_spiral_poses(self.n_poses)
+        # if self.spherify:
+        #     self.generate_spherical_poses(self.n_poses)
+        # else:
+        #     self.generate_spiral_poses(self.n_poses)
+        # self.cam_to_world = self.poses[:, :3, :4]
+        # self.focal = self.poses[0, -1, -1]
+        indices = np.arange(self.images.shape[0])[::8]
+        self.images = self.images[indices]
+        self.poses = self.poses[indices]
         self.cam_to_world = self.poses[:, :3, :4]
         self.focal = self.poses[0, -1, -1]
 
@@ -577,7 +588,6 @@ class nerf360(NeRFDataset):
             z = normalize(c - np.dot(c2w[:3, :4], np.array([0, 0, -focal, 1.])))
             render_poses.append(np.concatenate([look_at(z, up, c), hwf], 1))
         self.poses = np.array(render_poses).astype(np.float32)
-
 
 
 dataset_dict = {
