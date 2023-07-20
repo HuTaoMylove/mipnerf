@@ -12,7 +12,7 @@ from torch.utils.data import Dataset, DataLoader
 
 
 def get_dataset(dataset_name, base_dir, split, factor=4, device=torch.device("cpu"), config=None):
-    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device, config=None)
+    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device, config=config)
     return d
 
 
@@ -425,9 +425,9 @@ class LLFF(NeRFDataset):
 class nerf360(NeRFDataset):
     def __init__(self, base_dir, split, factor=4, spherify=True, near=None, far=None, white_bkgd=False,
                  device=torch.device("cpu"), config=None):
+        self.config = config
         super(nerf360, self).__init__(base_dir, split, spherify=spherify, near=near, far=far, white_bkgd=white_bkgd,
                                       factor=factor, device=device)
-        self.config = config
 
     def generate_training_poses(self):
         """Load data from disk"""

@@ -9,7 +9,7 @@ from pose_utils import visualize_depth, visualize_normals, to8b
 
 
 def visualize(config):
-    data = get_dataloader(config.dataset_name, config.base_dir, split="render", factor=config.factor, shuffle=False)
+    data = get_dataloader(config.dataset_name, config.base_dir, split="render", factor=config.factor, shuffle=False,config=config)
 
     model = MipNeRF(
         use_viewdirs=config.use_viewdirs,
