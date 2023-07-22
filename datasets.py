@@ -446,7 +446,7 @@ class nerf360(NeRFDataset):
                 image = to_float(np.array(Image.open(img_in)))
                 images.append(image)
         images = np.stack(images, -1)
-
+        print('finish loading image')
         # Load poses
         with open(path.join(self.base_dir, 'poses_bounds.npy'), 'rb') as fp:
             poses_arr = np.load(fp)
