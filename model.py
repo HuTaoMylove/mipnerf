@@ -108,6 +108,17 @@ class MipNeRF(nn.Module):
             nn.Linear(input_shape, 3),
             nn.Sigmoid()
         )
+
+        self.weight_net = nn.Sequential(
+            nn.Linear(self.density_input + self.rgb_input, hidden),
+            nn.ReLU(True),
+            nn.Linear(hidden, hidden),
+            nn.ReLU(True),
+            nn.Linear(hidden, hidden),
+            nn.ReLU(True),
+            nn.Linear(hidden, self.num_samples + 1),
+            nn.Sigmoid()
+        )
         _xavier_init(self)
         self.to(device)
 
@@ -118,9 +129,18 @@ class MipNeRF(nn.Module):
         for l in range(self.num_levels):
             # sample
             if l == 0:  # coarse grain sample
-                t_vals, (mean, var) = sample_along_rays(rays.origins, rays.directions, rays.radii, self.num_samples,
-                                                        rays.near, rays.far, randomized=self.randomized, lindisp=False,
-                                                        ray_shape=self.ray_shape)
+                # t_vals, (mean, var) = sample_along_rays(rays.origins, rays.directions, rays.radii, self.num_samples,
+                #                                         rays.near, rays.near, randomized=self.randomized, lindisp=False,
+                #                                         ray_shape=self.ray_shape)
+                pos = self.positional_encoding(rays.origins.to(self.device))
+                dir = self.viewdirs_encoding(rays.viewdirs.to(self.device))
+                dist = self.weight_net(torch.cat([pos, rays.viewdirs.to(self.device), dir], dim=-1))
+                t_vals = torch.cumsum(dist, dim=-1)
+                t_vals = t_vals / t_vals[..., None, -1]
+                d_vals = rays.near * (1. - t_vals) + rays.far * t_vals
+                t_vals = d_vals.detach()
+                from ray_utils import cast_rays
+                mean, var = cast_rays(t_vals, rays.origins, rays.directions, rays.radii, self.ray_shape)
             else:  # fine grain sample/s
                 t_vals, (mean, var) = resample_along_rays(rays.origins, rays.directions, rays.radii,
                                                           t_vals.to(rays.origins.device),
@@ -163,13 +183,15 @@ class MipNeRF(nn.Module):
             comp_rgbs.append(comp_rgb)
             distances.append(distance)
             accs.append(acc)
+            if l == 0:
+                loss_var = torch.std((d_vals[:, 1:] - d_vals[:, :-1]) * weights.detach(), unbiased=False, dim=-1).mean()
         if self.return_raw:
             raws = torch.cat((torch.clone(rgb).detach(), torch.clone(density).detach()), -1).cpu()
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
             return torch.stack(comp_rgbs), torch.stack(distances), torch.stack(accs), raws
         else:
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
-            return torch.stack(comp_rgbs), torch.stack(distances), torch.stack(accs)
+            return torch.stack(comp_rgbs), torch.stack(distances), torch.stack(accs), loss_var
 
     def render_image(self, rays, height, width, chunks=8192):
         """

@@ -12,17 +12,22 @@ from datasets import get_dataloader, cycle
 import numpy as np
 from tqdm import tqdm
 import os
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 def train_model(config):
     model_save_path = path.join(config.log_dir, "model.pt")
     optimizer_save_path = path.join(config.log_dir, "optim.pt")
 
-    data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device,config=config)))
+    data = iter(cycle(
+        get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor,
+                       batch_size=config.batch_size, shuffle=True, device=config.device, config=config)))
     eval_data = None
     if config.do_eval:
-        eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test", factor=config.factor, batch_size=config.batch_size, shuffle=True, device=config.device,config=config)))
+        eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test",
+                                              factor=config.factor, batch_size=config.batch_size, shuffle=True,
+                                              device=config.device, config=config)))
 
     model = MipNeRF(
         use_viewdirs=config.use_viewdirs,
@@ -47,7 +52,8 @@ def train_model(config):
         model.load_state_dict(torch.load(model_save_path))
         optimizer.load_state_dict(torch.load(optimizer_save_path))
 
-    scheduler = MipLRDecay(optimizer, lr_init=config.lr_init, lr_final=config.lr_final, max_steps=config.max_steps, lr_delay_steps=config.lr_delay_steps, lr_delay_mult=config.lr_delay_mult)
+    scheduler = MipLRDecay(optimizer, lr_init=config.lr_init, lr_final=config.lr_final, max_steps=config.max_steps,
+                           lr_delay_steps=config.lr_delay_steps, lr_delay_mult=config.lr_delay_mult)
     loss_func = NeRFLoss(config.coarse_weight_decay)
     model.train()
 
@@ -57,13 +63,14 @@ def train_model(config):
 
     for step in tqdm(range(0, config.max_steps)):
         rays, pixels = next(data)
-        comp_rgb, _, _ = model(rays)
+        comp_rgb, _, _, loss_var = model(rays)
         pixels = pixels.to(config.device)
 
         # Compute loss and update model weights.
         loss_val, psnr = loss_func(comp_rgb, pixels, rays.lossmult.to(config.device))
+        loss = loss_var + loss_val
         optimizer.zero_grad()
-        loss_val.backward()
+        loss.backward()
         optimizer.step()
         scheduler.step()
 
@@ -73,7 +80,7 @@ def train_model(config):
         logger.add_scalar('train/fine_psnr', float(psnr[-1]), global_step=step)
         logger.add_scalar('train/avg_psnr', float(np.mean(psnr)), global_step=step)
         logger.add_scalar('train/lr', float(scheduler.get_last_lr()[-1]), global_step=step)
-
+        logger.add_scalar('train/var', float(loss_var.detach().cpu().numpy()), global_step=step)
         if step % config.save_every == 0:
             if eval_data:
                 del rays
@@ -95,10 +102,10 @@ def eval_model(config, model, data):
     model.eval()
     rays, pixels = next(data)
     with torch.no_grad():
-        comp_rgb, _, _ = model(rays)
+        comp_rgb, _, _, _ = model(rays)
     pixels = pixels.to(config.device)
     model.train()
-    return torch.tensor([mse_to_psnr(torch.mean((rgb - pixels[..., :3])**2)) for rgb in comp_rgb])
+    return torch.tensor([mse_to_psnr(torch.mean((rgb - pixels[..., :3]) ** 2)) for rgb in comp_rgb])
 
 
 if __name__ == "__main__":
