@@ -110,7 +110,9 @@ class MipNeRF(nn.Module):
         )
 
         self.weight_net = nn.Sequential(
-            nn.Linear(self.density_input + self.rgb_input, hidden),
+            nn.Linear(hidden * 2, hidden),
+            nn.ReLU(True),
+            nn.Linear(hidden, hidden),
             nn.ReLU(True),
             nn.Linear(hidden, hidden),
             nn.ReLU(True),
@@ -129,12 +131,26 @@ class MipNeRF(nn.Module):
         for l in range(self.num_levels):
             # sample
             if l == 0:  # coarse grain sample
-                # t_vals, (mean, var) = sample_along_rays(rays.origins, rays.directions, rays.radii, self.num_samples,
-                #                                         rays.near, rays.near, randomized=self.randomized, lindisp=False,
-                #                                         ray_shape=self.ray_shape)
-                pos = self.positional_encoding(rays.origins.to(self.device))
-                dir = self.viewdirs_encoding(rays.viewdirs.to(self.device))
-                dist = self.weight_net(torch.cat([pos, rays.viewdirs.to(self.device), dir], dim=-1))
+                t_vals, (mean, var) = sample_along_rays(rays.origins, rays.directions, rays.radii, self.num_samples,
+                                                        rays.near, rays.far, randomized=self.randomized, lindisp=False,
+                                                        ray_shape=self.ray_shape)
+                # pos = self.positional_encoding(rays.origins.to(self.device))
+                # dir = self.viewdirs_encoding(rays.viewdirs.to(self.device))
+                # dist = self.weight_net(torch.cat([pos, rays.viewdirs.to(self.device), dir], dim=-1))
+                # t_vals = torch.cat([torch.zeros([dist.shape[0], 1], device=dist.device), torch.cumsum(dist, dim=-1)],
+                #                    dim=-1)
+                # t_vals = t_vals / t_vals[..., None, -1]
+                # d_vals = rays.near * (1. - t_vals) + rays.far * t_vals
+                # t_vals = d_vals.detach()
+                # from ray_utils import cast_rays
+                # mean, var = cast_rays(t_vals, rays.origins, rays.directions, rays.radii, self.ray_shape)
+            else:  # fine grain sample/s
+                # t_vals, (mean, var) = resample_along_rays(rays.origins, rays.directions, rays.radii,
+                #                                           t_vals.to(rays.origins.device),
+                #                                           weights.to(rays.origins.device), randomized=self.randomized,
+                #                                           stop_grad=True, resample_padding=self.resample_padding,
+                #                                           ray_shape=self.ray_shape)
+                dist = self.weight_net(torch.cat([add_encodings1, add_encodings2], dim=-1))
                 t_vals = torch.cat([torch.zeros([dist.shape[0], 1], device=dist.device), torch.cumsum(dist, dim=-1)],
                                    dim=-1)
                 t_vals = t_vals / t_vals[..., None, -1]
@@ -142,20 +158,22 @@ class MipNeRF(nn.Module):
                 t_vals = d_vals.detach()
                 from ray_utils import cast_rays
                 mean, var = cast_rays(t_vals, rays.origins, rays.directions, rays.radii, self.ray_shape)
-            else:  # fine grain sample/s
-                t_vals, (mean, var) = resample_along_rays(rays.origins, rays.directions, rays.radii,
-                                                          t_vals.to(rays.origins.device),
-                                                          weights.to(rays.origins.device), randomized=self.randomized,
-                                                          stop_grad=True, resample_padding=self.resample_padding,
-                                                          ray_shape=self.ray_shape)
             # do integrated positional encoding of samples
             samples_enc = self.positional_encoding(mean, var)[0]
             samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
 
             # predict density
             new_encodings = self.density_net0(samples_enc)
+
+            if l == 0:
+                add_encodings1 = torch.sum(new_encodings.reshape(-1, self.num_samples, self.hidden), dim=-2).detach()
+
             new_encodings = torch.cat((new_encodings, samples_enc), -1)
             new_encodings = self.density_net1(new_encodings)
+
+            if l == 0:
+                add_encodings2 = torch.sum(new_encodings.reshape(-1, self.num_samples, self.hidden), dim=-2).detach()
+
             raw_density = self.final_density(new_encodings).reshape((-1, self.num_samples, 1))
 
             # predict rgb
@@ -184,8 +202,9 @@ class MipNeRF(nn.Module):
             comp_rgbs.append(comp_rgb)
             distances.append(distance)
             accs.append(acc)
-            if l == 0:
-                loss_var = torch.var((d_vals[:, 1:] - d_vals[:, :-1]) * weights.detach(), unbiased=False, dim=-1).sum()
+            if l == 1:
+                loss_var = torch.var((d_vals[:, 1:] - d_vals[:, :-1]) * weights.detach(), unbiased=False,
+                                     dim=-1).sum() + 0.01 * (1 / d_vals).sum()
         if self.return_raw:
             raws = torch.cat((torch.clone(rgb).detach(), torch.clone(density).detach()), -1).cpu()
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
@@ -208,7 +227,7 @@ class MipNeRF(nn.Module):
             for i in range(0, length, chunks):
                 # put chunk of rays on device
                 chunk_rays = namedtuple_map(lambda r: r[i:i + chunks].to(self.device), rays)
-                rgb, distance, acc,_ = self(chunk_rays)
+                rgb, distance, acc, _ = self(chunk_rays)
                 rgbs.append(rgb[-1].cpu())
                 dists.append(distance[-1].cpu())
                 accs.append(acc[-1].cpu())

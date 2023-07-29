@@ -17,7 +17,7 @@ def get_config():
     config.add_argument("--white_bkgd", action="store_false")  # should be False if using llff
     config.add_argument("--override_defaults", action="store_true")
     config.add_argument("--num_levels", type=int, default=2)
-    config.add_argument("--num_samples", type=int, default=128)
+    config.add_argument("--num_samples", type=int, default=160)
     config.add_argument("--hidden", type=int, default=256)
     config.add_argument("--density_noise", type=float, default=0.0)
     config.add_argument("--density_bias", type=float, default=-1.0)
@@ -41,7 +41,7 @@ def get_config():
     config.add_argument("--do_eval", action="store_false")
     config.add_argument("--continue_training", action="store_true")
     config.add_argument("--save_every", type=int, default=1000)
-    config.add_argument("--device", type=str, default="cpu")
+    config.add_argument("--device", type=str, default="cuda")
     config.add_argument("--norm", type=str, default="min", help='bds normalize')
     # visualization hyperparams
     config.add_argument("--chunks", type=int, default=8192)
