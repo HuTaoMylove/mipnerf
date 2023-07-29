@@ -1,1 +1,1 @@
-python visualize.py --device 'cuda:1' --dataset_name "nerf360" --scene "bicycle" --factor 8 --visualize_depth --visualize_normals --white_bkgd --min_deg -6 --max_deg 10 --num_samples 256
+python visualize.py --device 'cuda:2' --dataset_name "nerf360" --scene "bicycle" --factor 8 --visualize_depth --visualize_normals --white_bkgd --min_deg -6 --max_deg 10

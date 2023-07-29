@@ -73,7 +73,8 @@ def get_config():
         base_data_path = "../../dataset/nerf360/"
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + 'bs_' + config.scene + '_' + str(
+    config.ray_shape = "cylinder"
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + 'bmbs_' + config.scene + '_' + str(
         config.min_deg) + '_' + str(config.max_deg) + '/'
     config.model_weight_path = config.log_dir + 'model.pt'
     return config

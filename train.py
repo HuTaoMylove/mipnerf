@@ -68,7 +68,10 @@ def train_model(config):
 
         # Compute loss and update model weights.
         loss_val, psnr = loss_func(comp_rgb, pixels, rays.lossmult.to(config.device))
-        loss = loss_var + loss_val
+        if step<2500:
+            loss=loss_val
+        else:
+            loss = loss_var + loss_val
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

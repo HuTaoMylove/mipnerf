@@ -116,7 +116,7 @@ class MipNeRF(nn.Module):
             nn.ReLU(True),
             nn.Linear(hidden, hidden),
             nn.ReLU(True),
-            nn.Linear(hidden, self.num_samples + 1),
+            nn.Linear(hidden, self.num_samples),
             nn.Sigmoid()
         )
         _xavier_init(self)
@@ -135,7 +135,8 @@ class MipNeRF(nn.Module):
                 pos = self.positional_encoding(rays.origins.to(self.device))
                 dir = self.viewdirs_encoding(rays.viewdirs.to(self.device))
                 dist = self.weight_net(torch.cat([pos, rays.viewdirs.to(self.device), dir], dim=-1))
-                t_vals = torch.cumsum(dist, dim=-1)
+                t_vals = torch.cat([torch.zeros([dist.shape[0], 1], device=dist.device), torch.cumsum(dist, dim=-1)],
+                                   dim=-1)
                 t_vals = t_vals / t_vals[..., None, -1]
                 d_vals = rays.near * (1. - t_vals) + rays.far * t_vals
                 t_vals = d_vals.detach()
@@ -184,7 +185,7 @@ class MipNeRF(nn.Module):
             distances.append(distance)
             accs.append(acc)
             if l == 0:
-                loss_var = torch.std((d_vals[:, 1:] - d_vals[:, :-1]) * weights.detach(), unbiased=False, dim=-1).mean()
+                loss_var = torch.var((d_vals[:, 1:] - d_vals[:, :-1]) * weights.detach(), unbiased=False, dim=-1).sum()
         if self.return_raw:
             raws = torch.cat((torch.clone(rgb).detach(), torch.clone(density).detach()), -1).cpu()
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
@@ -207,7 +208,7 @@ class MipNeRF(nn.Module):
             for i in range(0, length, chunks):
                 # put chunk of rays on device
                 chunk_rays = namedtuple_map(lambda r: r[i:i + chunks].to(self.device), rays)
-                rgb, distance, acc = self(chunk_rays)
+                rgb, distance, acc,_ = self(chunk_rays)
                 rgbs.append(rgb[-1].cpu())
                 dists.append(distance[-1].cpu())
                 accs.append(acc[-1].cpu())

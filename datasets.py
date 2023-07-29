@@ -485,7 +485,7 @@ class nerf360(NeRFDataset):
         #     self.generate_spiral_poses(self.n_poses)
         # self.cam_to_world = self.poses[:, :3, :4]
         # self.focal = self.poses[0, -1, -1]
-        indices = np.arange(self.images.shape[0])[::2]
+        indices = np.arange(self.images.shape[0])[::8]
         self.images = self.images[indices]
         self.poses = self.poses[indices]
         self.cam_to_world = self.poses[:, :3, :4]
