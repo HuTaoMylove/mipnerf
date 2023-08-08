@@ -8,8 +8,8 @@ def get_config():
 
     # basic hyperparams to specify where to load/save data from/to
     config.add_argument("--log_dir", type=str, default="log")
-    config.add_argument("--dataset_name", type=str, default="nerf360")
-    config.add_argument("--scene", type=str, default="bicycle")
+    config.add_argument("--dataset_name", type=str, default="blender")
+    config.add_argument("--scene", type=str, default="mic")
     # model hyperparams
     config.add_argument("--use_viewdirs", action="store_false")
     config.add_argument("--randomized", action="store_false")
@@ -17,7 +17,7 @@ def get_config():
     config.add_argument("--white_bkgd", action="store_false")  # should be False if using llff
     config.add_argument("--override_defaults", action="store_true")
     config.add_argument("--num_levels", type=int, default=2)
-    config.add_argument("--num_samples", type=int, default=160)
+    config.add_argument("--num_samples", type=int, default=128)
     config.add_argument("--hidden", type=int, default=256)
     config.add_argument("--density_noise", type=float, default=0.0)
     config.add_argument("--density_bias", type=float, default=-1.0)
@@ -73,8 +73,8 @@ def get_config():
         base_data_path = "../../dataset/nerf360/"
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
-    config.ray_shape = "cylinder"
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + 'bmbs_' + config.scene + '_' + str(
+    # config.ray_shape = "cylinder"
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_' + str(
         config.min_deg) + '_' + str(config.max_deg) + '/'
     config.model_weight_path = config.log_dir + 'model.pt'
     return config
