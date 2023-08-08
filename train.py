@@ -63,13 +63,15 @@ def train_model(config):
 
     for step in tqdm(range(0, config.max_steps)):
         rays, pixels = next(data)
-        comp_rgb, _, _ = model(rays)
+        comp_rgb, hard_rgb, _, _ = model(rays)
         pixels = pixels.to(config.device)
 
         # Compute loss and update model weights.
         loss_val, psnr = loss_func(comp_rgb, pixels, rays.lossmult.to(config.device))
+        loss_hard, _ = loss_func(hard_rgb, pixels, rays.lossmult.to(config.device))
+        loss = loss_val + 0.2 * loss_hard
         optimizer.zero_grad()
-        loss_val.backward()
+        loss.backward()
         optimizer.step()
         scheduler.step()
 
@@ -100,7 +102,7 @@ def eval_model(config, model, data):
     model.eval()
     rays, pixels = next(data)
     with torch.no_grad():
-        comp_rgb, _, _ = model(rays)
+        comp_rgb, _, _, _ = model(rays)
     pixels = pixels.to(config.device)
     model.train()
     return torch.tensor([mse_to_psnr(torch.mean((rgb - pixels[..., :3]) ** 2)) for rgb in comp_rgb])

@@ -74,7 +74,6 @@ def get_config():
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
     # config.ray_shape = "cylinder"
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_' + str(
-        config.min_deg) + '_' + str(config.max_deg) + '/'
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_' + 'use_grad' + '/'
     config.model_weight_path = config.log_dir + 'model.pt'
     return config

@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import collections
 
-
 Rays = collections.namedtuple('Rays', ('origins', 'directions', 'viewdirs', 'radii', 'lossmult', 'near', 'far'))
 
 
@@ -34,7 +33,8 @@ def sorted_piecewise_constant_pdf(bins, weights, num_samples, randomized):
     if randomized:
         s = 1 / num_samples
         u = (torch.arange(num_samples, device=cdf.device) * s)[None, ...]
-        u = u + u + torch.empty(list(cdf.shape[:-1]) + [num_samples], device=cdf.device).uniform_(to=(s - torch.finfo(torch.float32).eps))
+        u = u + u + torch.empty(list(cdf.shape[:-1]) + [num_samples], device=cdf.device).uniform_(
+            to=(s - torch.finfo(torch.float32).eps))
         # `u` is in [0, 1) --- it can be zero, but it can never be 1.
         u = torch.minimum(u, torch.full_like(u, 1. - torch.finfo(torch.float32).eps, device=u.device))
     else:
@@ -72,12 +72,12 @@ def convert_to_ndc(origins, directions, focal, w, h, near=1.):
 
     # Projection
     o0 = -((2 * focal) / w) * (ox / (oz + 1e-15))
-    o1 = -((2 * focal) / h) * (oy / (oz+ 1e-15) )
-    o2 = 1 + 2 * near / (oz+ 1e-15)
+    o1 = -((2 * focal) / h) * (oy / (oz + 1e-15))
+    o2 = 1 + 2 * near / (oz + 1e-15)
 
-    d0 = -((2 * focal) / w) * (dx / (dz+ 1e-15) - ox / (oz+ 1e-15))
-    d1 = -((2 * focal) / h) * (dy / (dz+ 1e-15) - oy / (oz+ 1e-15))
-    d2 = -2 * near / (oz+ 1e-15)
+    d0 = -((2 * focal) / w) * (dx / (dz + 1e-15) - ox / (oz + 1e-15))
+    d1 = -((2 * focal) / h) * (dy / (dz + 1e-15) - oy / (oz + 1e-15))
+    d2 = -2 * near / (oz + 1e-15)
 
     origins = np.stack([o0, o1, o2], -1)
     directions = np.stack([d0, d1, d2], -1)
@@ -128,16 +128,16 @@ def conical_frustum_to_gaussian(d, t0, t1, base_radius, diag, stable=True):
     if stable:
         mu = (t0 + t1) / 2
         hw = (t1 - t0) / 2
-        t_mean = mu + (2 * mu * hw**2) / (3 * mu**2 + hw**2)
-        t_var = (hw**2) / 3 - (4 / 15) * ((hw**4 * (12 * mu**2 - hw**2)) /
-                                          (3 * mu**2 + hw**2)**2)
-        r_var = base_radius**2 * ((mu**2) / 4 + (5 / 12) * hw**2 - 4 / 15 *
-                                  (hw**4) / (3 * mu**2 + hw**2))
+        t_mean = mu + (2 * mu * hw ** 2) / (3 * mu ** 2 + hw ** 2)
+        t_var = (hw ** 2) / 3 - (4 / 15) * ((hw ** 4 * (12 * mu ** 2 - hw ** 2)) /
+                                            (3 * mu ** 2 + hw ** 2) ** 2)
+        r_var = base_radius ** 2 * ((mu ** 2) / 4 + (5 / 12) * hw ** 2 - 4 / 15 *
+                                    (hw ** 4) / (3 * mu ** 2 + hw ** 2))
     else:
-        t_mean = (3 * (t1**4 - t0**4)) / (4 * (t1**3 - t0**3))
-        r_var = base_radius**2 * (3 / 20 * (t1**5 - t0**5) / (t1**3 - t0**3))
-        t_mosq = 3 / 5 * (t1**5 - t0**5) / (t1**3 - t0**3)
-        t_var = t_mosq - t_mean**2
+        t_mean = (3 * (t1 ** 4 - t0 ** 4)) / (4 * (t1 ** 3 - t0 ** 3))
+        r_var = base_radius ** 2 * (3 / 20 * (t1 ** 5 - t0 ** 5) / (t1 ** 3 - t0 ** 3))
+        t_mosq = 3 / 5 * (t1 ** 5 - t0 ** 5) / (t1 ** 3 - t0 ** 3)
+        t_var = t_mosq - t_mean ** 2
     return lift_gaussian(d, t_mean, t_var, r_var, diag)
 
 
@@ -209,7 +209,7 @@ def sample_along_rays(origins, directions, radii, num_samples, near, far, random
     """
     batch_size = origins.shape[0]
 
-    t_vals = torch.linspace(0., 1., num_samples + 1,  device=origins.device)
+    t_vals = torch.linspace(0., 1., num_samples + 1, device=origins.device)
     if lindisp:
         t_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * t_vals)
     else:
@@ -228,7 +228,8 @@ def sample_along_rays(origins, directions, radii, num_samples, near, far, random
     return t_vals, (means, covs)
 
 
-def resample_along_rays(origins, directions, radii, t_vals, weights, randomized, stop_grad, resample_padding, ray_shape):
+def resample_along_rays(origins, directions, radii, t_vals, weights, randomized, stop_grad, resample_padding,
+                        ray_shape):
     """Resampling.
 
     Args:
@@ -311,6 +312,11 @@ def volumetric_rendering(rgb, density, t_vals, dirs, white_bkgd):
     acc = weights.sum(dim=-1)
     distance = (weights * t_mids).sum(dim=-1) / acc
     distance = torch.clamp(torch.nan_to_num(distance), t_vals[:, 0], t_vals[:, -1])
+    max_pos = torch.argmax(weights, dim=-1)
+    nearer = t_vals[torch.arange(weights.shape[0]), max_pos]
+    farer = t_vals[torch.arange(weights.shape[0]), max_pos + 1]
+    surface = torch.stack([nearer, farer], dim=-1)
+
     if white_bkgd:
         comp_rgb = comp_rgb + (1. - acc[..., None])
-    return comp_rgb, distance, acc, weights, alpha
+    return comp_rgb, distance, acc, weights, alpha, surface

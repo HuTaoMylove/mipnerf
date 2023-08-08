@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from ray_utils import sample_along_rays, resample_along_rays, volumetric_rendering, namedtuple_map
 from pose_utils import to8b
+from ray_utils import cast_rays
 
 
 class PositionalEncoding(nn.Module):
@@ -115,6 +116,7 @@ class MipNeRF(nn.Module):
         comp_rgbs = []
         distances = []
         accs = []
+        hard_rgbs = []
         for l in range(self.num_levels):
             # sample
             if l == 0:  # coarse grain sample
@@ -157,19 +159,43 @@ class MipNeRF(nn.Module):
             # volumetric rendering
             rgb = raw_rgb * (1 + 2 * self.rgb_padding) - self.rgb_padding
             density = self.density_activation(raw_density + self.density_bias)
-            comp_rgb, distance, acc, weights, alpha = volumetric_rendering(rgb, density, t_vals,
-                                                                           rays.directions.to(rgb.device),
-                                                                           self.white_bkgd)
+            comp_rgb, distance, acc, weights, alpha, surface = volumetric_rendering(rgb, density, t_vals,
+                                                                                    rays.directions.to(rgb.device),
+                                                                                    self.white_bkgd)
+
+            mean, var = cast_rays(surface, rays.origins, rays.directions, rays.radii, self.ray_shape)
+            samples_enc = self.positional_encoding(mean, var)[0]
+            samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
+            new_encodings = self.density_net0(samples_enc)
+            new_encodings = torch.cat((new_encodings, samples_enc), -1)
+            new_encodings = self.density_net1(new_encodings)
+            if self.use_viewdirs:
+                #  do positional encoding of viewdirs
+                viewdirs = self.viewdirs_encoding(rays.viewdirs.to(self.device))
+                viewdirs = torch.cat((viewdirs, rays.viewdirs.to(self.device)), -1)
+                viewdirs = torch.tile(viewdirs[:, None, :], (1, 1, 1))
+                viewdirs = viewdirs.reshape((-1, viewdirs.shape[-1]))
+                new_encodings = self.rgb_net0(new_encodings)
+                new_encodings = torch.cat((new_encodings, viewdirs), -1)
+                new_encodings = self.rgb_net1(new_encodings)
+            raw_rgb = self.final_rgb(new_encodings)
+            if self.randomized and self.density_noise:
+                raw_density += self.density_noise * torch.rand(raw_density.shape, dtype=raw_density.dtype,
+                                                               device=raw_density.device)
+            hard_rgb = raw_rgb * (1 + 2 * self.rgb_padding) - self.rgb_padding
+            if self.white_bkgd:
+                hard_rgb = hard_rgb + (1. - acc[..., None])
             comp_rgbs.append(comp_rgb)
             distances.append(distance)
             accs.append(acc)
+            hard_rgbs.append(hard_rgb)
         if self.return_raw:
             raws = torch.cat((torch.clone(rgb).detach(), torch.clone(density).detach()), -1).cpu()
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
             return torch.stack(comp_rgbs), torch.stack(distances), torch.stack(accs), raws
         else:
             # Predicted RGB values for rays, Disparity map (inverse of depth), Accumulated opacity (alpha) along a ray
-            return torch.stack(comp_rgbs), torch.stack(distances), torch.stack(accs)
+            return torch.stack(comp_rgbs), torch.stack(hard_rgbs), torch.stack(distances), torch.stack(accs)
 
     def render_image(self, rays, height, width, chunks=8192):
         """
