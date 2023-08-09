@@ -91,6 +91,7 @@ class NeRFDataset(Dataset):
     def generate_spherical_poses(self, n_poses=120):
         self.poses = generate_spherical_cam_to_world(self.radius, n_poses)
         self.cam_to_world = self.poses[:, :3, :4]
+        # self.cam_to_world[:, :3, -1] = self.cam_to_world[:, :3, -1] * 0.5
 
     def generate_spiral_poses(self, n_poses=120):
         self.cam_to_world = generate_spiral_cam_to_world(self.radii, self.focal, n_poses)

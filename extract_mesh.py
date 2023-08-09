@@ -33,7 +33,7 @@ def extract_mesh(config):
         device=config.device,
         return_raw=True
     )
-    model.load_state_dict(torch.load(config.model_weight_path))
+    model.load_state_dict(torch.load(config.model_weight_path,map_location=config.device))
     model.eval()
     model = model.to(config.device)
 

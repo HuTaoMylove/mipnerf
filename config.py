@@ -9,7 +9,7 @@ def get_config():
     # basic hyperparams to specify where to load/save data from/to
     config.add_argument("--log_dir", type=str, default="log")
     config.add_argument("--dataset_name", type=str, default="blender")
-    config.add_argument("--scene", type=str, default="mic")
+    config.add_argument("--scene", type=str, default="drums")
     # model hyperparams
     config.add_argument("--use_viewdirs", action="store_false")
     config.add_argument("--randomized", action="store_false")
@@ -35,7 +35,7 @@ def get_config():
     config.add_argument("--lr_delay_mult", type=float, default=0.1)
     config.add_argument("--weight_decay", type=float, default=1e-5)
     # training hyperparams
-    config.add_argument("--factor", type=int, default=8)
+    config.add_argument("--factor", type=int, default=2)
     config.add_argument("--max_steps", type=int, default=200_000)
     config.add_argument("--batch_size", type=int, default=2048)
     config.add_argument("--do_eval", action="store_false")
@@ -74,7 +74,6 @@ def get_config():
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
     # config.ray_shape = "cylinder"
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '_' + str(
-        config.min_deg) + '_' + str(config.max_deg) + '/'
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene+f'_deg_{config.min_deg}_{config.max_deg}_factor_{config.factor}' + '/'
     config.model_weight_path = config.log_dir + 'model.pt'
     return config

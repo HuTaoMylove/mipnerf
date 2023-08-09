@@ -185,7 +185,7 @@ class MipNeRF(nn.Module):
             for i in range(0, length, chunks):
                 # put chunk of rays on device
                 chunk_rays = namedtuple_map(lambda r: r[i:i + chunks].to(self.device), rays)
-                rgb, distance, acc, _ = self(chunk_rays)
+                rgb, distance, acc = self(chunk_rays)
                 rgbs.append(rgb[-1].cpu())
                 dists.append(distance[-1].cpu())
                 accs.append(acc[-1].cpu())

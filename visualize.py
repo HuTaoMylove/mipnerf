@@ -29,7 +29,7 @@ def visualize(config):
         viewdirs_max_deg=config.viewdirs_max_deg,
         device=config.device,
     )
-    model.load_state_dict(torch.load(config.model_weight_path))
+    model.load_state_dict(torch.load(config.model_weight_path,map_location=config.device))
     model.eval()
 
     print("Generating Video using", len(data), "different view points")
