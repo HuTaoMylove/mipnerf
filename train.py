@@ -46,6 +46,7 @@ def train_model(config):
         viewdirs_min_deg=config.viewdirs_min_deg,
         viewdirs_max_deg=config.viewdirs_max_deg,
         device=config.device,
+        config=config
     )
     optimizer = optim.AdamW(model.parameters(), lr=config.lr_init, weight_decay=config.weight_decay)
     if config.continue_training:

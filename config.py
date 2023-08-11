@@ -1,6 +1,7 @@
 import argparse
 import torch
 from os import path
+import os
 
 
 def get_config():
@@ -11,6 +12,7 @@ def get_config():
     config.add_argument("--dataset_name", type=str, default="blender")
     config.add_argument("--scene", type=str, default="drums")
     # model hyperparams
+    config.add_argument("--use_exp", action="store_true")
     config.add_argument("--use_viewdirs", action="store_false")
     config.add_argument("--randomized", action="store_false")
     config.add_argument("--ray_shape", type=str, default="cone")  # should be "cylinder" if llff
@@ -74,6 +76,17 @@ def get_config():
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
     # config.ray_shape = "cylinder"
-    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene+f'_deg_{config.min_deg}_{config.max_deg}_factor_{config.factor}' + '/'
+    config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
+    if path.exists(config.log_dir):
+        t = len(os.listdir(config.log_dir))
+    else:
+        t = 0
+    config.log_dir = config.log_dir + f'version_{t}/'
+    os.makedirs(config.log_dir, exist_ok=True)
+
+    file = open(config.log_dir + 'config.txt', 'w')
+    for k in config.__dict__.keys():
+        file.write(str(k) + ' ' + str(config.__dict__[k]) + '\n')
+    file.close()
     config.model_weight_path = config.log_dir + 'model.pt'
     return config

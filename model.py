@@ -47,7 +47,8 @@ class MipNeRF(nn.Module):
                  viewdirs_min_deg=0,
                  viewdirs_max_deg=4,
                  device=torch.device("cpu"),
-                 return_raw=False
+                 return_raw=False,
+                 config=None
                  ):
         super(MipNeRF, self).__init__()
         self.use_viewdirs = use_viewdirs
@@ -66,7 +67,10 @@ class MipNeRF(nn.Module):
         self.hidden = hidden
         self.device = device
         self.return_raw = return_raw
-        self.density_activation = nn.Softplus()
+        if config.use_exp:
+            self.density_activation = torch.exp
+        else:
+            self.density_activation = nn.Softplus()
         self.positional_encoding = PositionalEncoding(min_deg, max_deg)
         self.density_net0 = nn.Sequential(
             nn.Linear(self.density_input, hidden),
@@ -136,7 +140,6 @@ class MipNeRF(nn.Module):
             new_encodings = torch.cat((new_encodings, samples_enc), -1)
             new_encodings = self.density_net1(new_encodings)
             raw_density = self.final_density(new_encodings).reshape((-1, self.num_samples, 1))
-
             # predict rgb
             if self.use_viewdirs:
                 #  do positional encoding of viewdirs
