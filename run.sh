@@ -1,1 +1,1 @@
-python train.py --device 'cuda:0' --scene "drums"  --min_deg -1 --max_deg 15
+python train.py --device 'cuda:9' --scene "drums" --min_deg -1 --max_deg 15
