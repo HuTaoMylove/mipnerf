@@ -51,6 +51,7 @@ class MipNeRF(nn.Module):
                  config=None
                  ):
         super(MipNeRF, self).__init__()
+        self.config=config
         self.use_viewdirs = use_viewdirs
         self.init_randomized = randomized
         self.randomized = randomized
@@ -134,7 +135,11 @@ class MipNeRF(nn.Module):
             # do integrated positional encoding of samples
             samples_enc = self.positional_encoding(mean, var)[0]
             samples_enc = samples_enc.reshape([-1, samples_enc.shape[-1]])
-
+            if self.config.limit_f:
+                index = (mean.detach().norm(dim=-1, keepdim=True) < 1.5).reshape(-1, 1)
+                # if torch.norm(samples_enc,dim=-1)
+                samples_enc[:, 6:self.density_input // 2] = index*samples_enc[:, 6:self.density_input // 2]
+                samples_enc[:, self.density_input // 2 + 6:] = index*samples_enc[:, self.density_input // 2 + 6:]
             # predict density
             new_encodings = self.density_net0(samples_enc)
             new_encodings = torch.cat((new_encodings, samples_enc), -1)

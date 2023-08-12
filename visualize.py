@@ -28,6 +28,7 @@ def visualize(config):
         viewdirs_min_deg=config.viewdirs_min_deg,
         viewdirs_max_deg=config.viewdirs_max_deg,
         device=config.device,
+        config=config
     )
     model.load_state_dict(torch.load(config.model_weight_path,map_location=config.device))
     model.eval()

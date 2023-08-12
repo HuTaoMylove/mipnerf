@@ -6,11 +6,13 @@ import os
 
 def get_config():
     config = argparse.ArgumentParser()
-
+    # test fre
+    config.add_argument("--limit_f", action="store_true")
     # basic hyperparams to specify where to load/save data from/to
+    config.add_argument("--version", type=int, default=0)
     config.add_argument("--log_dir", type=str, default="log")
     config.add_argument("--dataset_name", type=str, default="blender")
-    config.add_argument("--scene", type=str, default="drums")
+    config.add_argument("--scene", type=str, default="lego")
     # model hyperparams
     config.add_argument("--use_exp", action="store_true")
     config.add_argument("--use_viewdirs", action="store_false")
@@ -46,6 +48,7 @@ def get_config():
     config.add_argument("--device", type=str, default="cuda")
     config.add_argument("--norm", type=str, default="min", help='bds normalize')
     # visualization hyperparams
+    config.add_argument("--eval", action="store_true")
     config.add_argument("--chunks", type=int, default=8192)
     config.add_argument("--model_weight_path", default="log/model.pt")
     config.add_argument("--visualize_depth", action="store_true")
@@ -77,16 +80,20 @@ def get_config():
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
     # config.ray_shape = "cylinder"
     config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
+
     if path.exists(config.log_dir):
         t = len(os.listdir(config.log_dir))
     else:
         t = 0
+    if config.eval or config.continue_training:
+        t = config.version
     config.log_dir = config.log_dir + f'version_{t}/'
     os.makedirs(config.log_dir, exist_ok=True)
 
-    file = open(config.log_dir + 'config.txt', 'w')
-    for k in config.__dict__.keys():
-        file.write(str(k) + ' ' + str(config.__dict__[k]) + '\n')
-    file.close()
+    if not (config.eval or config.continue_training):
+        file = open(config.log_dir + 'config.txt', 'w')
+        for k in config.__dict__.keys():
+            file.write(str(k) + ' ' + str(config.__dict__[k]) + '\n')
+        file.close()
     config.model_weight_path = config.log_dir + 'model.pt'
     return config

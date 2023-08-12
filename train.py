@@ -50,8 +50,8 @@ def train_model(config):
     )
     optimizer = optim.AdamW(model.parameters(), lr=config.lr_init, weight_decay=config.weight_decay)
     if config.continue_training:
-        model.load_state_dict(torch.load(model_save_path))
-        optimizer.load_state_dict(torch.load(optimizer_save_path))
+        model.load_state_dict(torch.load(model_save_path, map_location=config.device))
+        optimizer.load_state_dict(torch.load(optimizer_save_path,map_location=config.device))
 
     scheduler = MipLRDecay(optimizer, lr_init=config.lr_init, lr_final=config.lr_final, max_steps=config.max_steps,
                            lr_delay_steps=config.lr_delay_steps, lr_delay_mult=config.lr_delay_mult)
