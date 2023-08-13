@@ -12,7 +12,7 @@ def get_config():
     config.add_argument("--version", type=int, default=0)
     config.add_argument("--log_dir", type=str, default="log")
     config.add_argument("--dataset_name", type=str, default="blender")
-    config.add_argument("--scene", type=str, default="lego")
+    config.add_argument("--scene", type=str, default="drums")
     # model hyperparams
     config.add_argument("--use_exp", action="store_true")
     config.add_argument("--use_viewdirs", action="store_false")
@@ -39,9 +39,10 @@ def get_config():
     config.add_argument("--lr_delay_mult", type=float, default=0.1)
     config.add_argument("--weight_decay", type=float, default=1e-5)
     # training hyperparams
-    config.add_argument("--factor", type=int, default=2)
+    config.add_argument("--factor", type=int, default=1)
     config.add_argument("--max_steps", type=int, default=200_000)
-    config.add_argument("--batch_size", type=int, default=2048)
+    config.add_argument("--batch_size", type=int, default=4096)
+    config.add_argument("--test_batch_size", type=int, default=800*800*2)
     config.add_argument("--do_eval", action="store_false")
     config.add_argument("--continue_training", action="store_true")
     config.add_argument("--save_every", type=int, default=1000)
@@ -78,7 +79,6 @@ def get_config():
         base_data_path = "../../dataset/nerf360/"
     config.base_dir = path.join(base_data_path, config.scene)
     # config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
-    # config.ray_shape = "cylinder"
     config.log_dir = config.log_dir + '/' + config.dataset_name + '/' + config.scene + '/'
 
     if path.exists(config.log_dir):

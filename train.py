@@ -17,16 +17,15 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
 def train_model(config):
-    model_save_path = path.join(config.log_dir, "model.pt")
-    optimizer_save_path = path.join(config.log_dir, "optim.pt")
-
+    ckpt_save_path = path.join(config.log_dir, "ckpt.pt")
+    best_path = path.join(config.log_dir, "best_ckpt.pt")
     data = iter(cycle(
         get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor,
                        batch_size=config.batch_size, shuffle=True, device=config.device, config=config)))
     eval_data = None
     if config.do_eval:
         eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test",
-                                              factor=config.factor, batch_size=config.batch_size, shuffle=True,
+                                              factor=config.factor, batch_size=config.test_batch_size, shuffle=True,
                                               device=config.device, config=config)))
 
     model = MipNeRF(
@@ -49,20 +48,21 @@ def train_model(config):
         config=config
     )
     optimizer = optim.AdamW(model.parameters(), lr=config.lr_init, weight_decay=config.weight_decay)
-    if config.continue_training:
-        model.load_state_dict(torch.load(model_save_path, map_location=config.device))
-        optimizer.load_state_dict(torch.load(optimizer_save_path,map_location=config.device))
-
     scheduler = MipLRDecay(optimizer, lr_init=config.lr_init, lr_final=config.lr_final, max_steps=config.max_steps,
                            lr_delay_steps=config.lr_delay_steps, lr_delay_mult=config.lr_delay_mult)
+    best_psnr = 0.0
+    if config.continue_training:
+        ckpt = torch.load(ckpt_save_path, map_location=config.device)
+        model.load_state_dict(ckpt['model'])
+        optimizer.load_state_dict(ckpt['optim'])
+        scheduler.last_epoch = ckpt['epoch']
+        best_psnr = ckpt['best_psnr']
     loss_func = NeRFLoss(config.coarse_weight_decay)
     model.train()
-
     os.makedirs(config.log_dir, exist_ok=True)
-    shutil.rmtree(path.join(config.log_dir, 'train'), ignore_errors=True)
     logger = tb.SummaryWriter(path.join(config.log_dir, 'train'), flush_secs=1)
 
-    for step in tqdm(range(0, config.max_steps)):
+    for step in tqdm(range(scheduler.last_epoch, config.max_steps)):
         rays, pixels = next(data)
         comp_rgb, _, _ = model(rays)
         pixels = pixels.to(config.device)
@@ -78,7 +78,6 @@ def train_model(config):
         logger.add_scalar('train/loss', float(loss_val.detach().cpu().numpy()), global_step=step)
         logger.add_scalar('train/coarse_psnr', float(np.mean(psnr[:-1])), global_step=step)
         logger.add_scalar('train/fine_psnr', float(psnr[-1]), global_step=step)
-        logger.add_scalar('train/avg_psnr', float(np.mean(psnr)), global_step=step)
         logger.add_scalar('train/lr', float(scheduler.get_last_lr()[-1]), global_step=step)
         if step % config.save_every == 0:
             if eval_data:
@@ -88,13 +87,16 @@ def train_model(config):
                 psnr = psnr.detach().cpu().numpy()
                 logger.add_scalar('eval/coarse_psnr', float(np.mean(psnr[:-1])), global_step=step)
                 logger.add_scalar('eval/fine_psnr', float(psnr[-1]), global_step=step)
-                logger.add_scalar('eval/avg_psnr', float(np.mean(psnr)), global_step=step)
-
-            torch.save(model.state_dict(), model_save_path)
-            torch.save(optimizer.state_dict(), optimizer_save_path)
-
-    torch.save(model.state_dict(), model_save_path)
-    torch.save(optimizer.state_dict(), optimizer_save_path)
+                ckpt = {
+                    'model': model.state_dict(),
+                    'optim': optimizer.state_dict(),
+                    'epoch': step + 1,
+                    'best_psnr': max(best_psnr, float(psnr[-1]))
+                }
+                torch.save(ckpt, ckpt_save_path)
+                if float(psnr[-1]) > best_psnr:
+                    best_psnr = float(psnr[-1])
+                    torch.save(ckpt, best_path)
 
 
 def eval_model(config, model, data):

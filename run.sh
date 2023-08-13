@@ -1,1 +1,1 @@
-python train.py --device 'cuda:9' --scene "lego" --hidden 128 --limit_f --use_exp
+python train.py --device 'cuda:0' --scene "drums"
