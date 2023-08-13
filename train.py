@@ -25,7 +25,7 @@ def train_model(config):
     eval_data = None
     if config.do_eval:
         eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test",
-                                              factor=config.factor, batch_size=config.test_batch_size, shuffle=True,
+                                              factor=config.factor, batch_size=config.chunks, shuffle=True,
                                               device=config.device, config=config)))
 
     model = MipNeRF(
@@ -83,10 +83,16 @@ def train_model(config):
             if eval_data:
                 del rays
                 del pixels
-                psnr = eval_model(config, model, eval_data)
-                psnr = psnr.detach().cpu().numpy()
-                logger.add_scalar('eval/coarse_psnr', float(np.mean(psnr[:-1])), global_step=step)
-                logger.add_scalar('eval/fine_psnr', float(psnr[-1]), global_step=step)
+                psnr_sum_c, psnr_sum_r = 0, 0
+                for i in range(10):
+                    psnr = eval_model(config, model, eval_data)
+                    psnr = psnr.detach().cpu().numpy()
+                    psnr_sum_c += psnr[0]
+                    psnr_sum_r += psnr[1]
+                psnr_sum_c /= 10
+                psnr_sum_r /= 10
+                logger.add_scalar('eval/coarse_psnr', float(psnr_sum_c), global_step=step)
+                logger.add_scalar('eval/fine_psnr', float(psnr_sum_r), global_step=step)
                 ckpt = {
                     'model': model.state_dict(),
                     'optim': optimizer.state_dict(),
