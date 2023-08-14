@@ -1,1 +1,1 @@
-python train.py --device 'cuda:0' --scene "drums"
+python train.py --device 'cuda:7' --scene "drums" --limit_f

@@ -9,3 +9,7 @@ python train.py --dataset_name "nerf360" --scene "bicycle" --device 'cuda:0' --f
 
 python train.py --device 'cuda:0' --scene "drums"  --min_deg -1 --max_deg 15
 python train.py --device 'cuda:1' --scene "drums"
+
+python train.py --device 'cuda:7' --scene "drums" --limit_f
+python train.py --device 'cuda:8' --scene "drums" 
+python train.py --device 'cuda:9' --scene "drums" --use_exp
