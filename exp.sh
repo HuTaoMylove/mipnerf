@@ -19,3 +19,4 @@ python train.py --device 'cuda:6' --scene "drums" --learnable_f --sample 'prob'
 
 
 python train.py --device 'cuda:9' --scene "drums" --learnable_f
+python visualize.py --device 'cuda:6' --scene "drums" --factor 4 --visualize_depth  --learnable_f --eval --version 6

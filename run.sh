@@ -1,1 +1,1 @@
-python visualize.py --device 'cuda:6' --scene "drums" --factor 4 --visualize_depth  --learnable_f --eval --version 6
+python eval.py --device 'cuda:6' --scene "drums" --visualize_depth  --eval --version 6
