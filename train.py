@@ -21,12 +21,12 @@ def train_model(config):
     best_path = path.join(config.log_dir, "best_ckpt.pt")
     data = iter(cycle(
         get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor,
-                       batch_size=config.batch_size, shuffle=True, device=config.device, config=config)))
+                       batch_size=config.batch_size, shuffle=True, device=config.device)))
     eval_data = None
     if config.do_eval:
         eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test",
                                               factor=config.factor, batch_size=config.chunks, shuffle=True,
-                                              device=config.device, config=config)))
+                                              device=config.device)))
 
     model = MipNeRF(
         use_viewdirs=config.use_viewdirs,
@@ -57,6 +57,11 @@ def train_model(config):
         optimizer.load_state_dict(ckpt['optim'])
         scheduler.last_epoch = ckpt['epoch']
         best_psnr = ckpt['best_psnr']
+        if ckpt['epoch'] >= 20_000 and config.sample == 'prob':
+            data = iter(cycle(
+                get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train",
+                               factor=config.factor,
+                               batch_size=config.batch_size, shuffle=True, device=config.device, sample=config.sample)))
     loss_func = NeRFLoss(config.coarse_weight_decay)
     model.train()
     os.makedirs(config.log_dir, exist_ok=True)
@@ -79,6 +84,11 @@ def train_model(config):
         logger.add_scalar('train/coarse_psnr', float(np.mean(psnr[:-1])), global_step=step)
         logger.add_scalar('train/fine_psnr', float(psnr[-1]), global_step=step)
         logger.add_scalar('train/lr', float(scheduler.get_last_lr()[-1]), global_step=step)
+        if step == 20_000 and config.sample == 'prob':
+            data = iter(cycle(
+                get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train",
+                               factor=config.factor,
+                               batch_size=config.batch_size, shuffle=True, device=config.device, sample=config.sample)))
         if step % config.save_every == 0:
             if eval_data:
                 del rays

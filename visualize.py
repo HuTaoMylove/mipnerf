@@ -9,7 +9,7 @@ from pose_utils import visualize_depth, visualize_normals, to8b
 
 
 def visualize(config):
-    data = get_dataloader(config.dataset_name, config.base_dir, split="render", factor=config.factor, shuffle=False,config=config)
+    data = get_dataloader(config.dataset_name, config.base_dir, split="render", factor=config.factor, shuffle=False)
 
     model = MipNeRF(
         use_viewdirs=config.use_viewdirs,
@@ -30,7 +30,9 @@ def visualize(config):
         device=config.device,
         config=config
     )
-    model.load_state_dict(torch.load(config.model_weight_path,map_location=config.device))
+    best_path = path.join(config.log_dir, "best_ckpt.pt")
+    ckpt = torch.load(best_path, map_location=config.device)
+    model.load_state_dict(ckpt['model'])
     model.eval()
 
     print("Generating Video using", len(data), "different view points")
@@ -40,7 +42,7 @@ def visualize(config):
     if config.visualize_normals:
         normal_frames = []
     for ray in tqdm(data):
-        img, dist, acc = model.render_image(ray, data.h, data.w, chunks=config.chunks)
+        img, dist, acc = model.render_image(ray, data.h, data.w, chunks=config.chunks*2)
         rgb_frames.append(img)
         if config.visualize_depth:
             depth_frames.append(to8b(visualize_depth(dist, acc, data.near, data.far)))

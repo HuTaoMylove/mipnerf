@@ -13,3 +13,9 @@ python train.py --device 'cuda:1' --scene "drums"
 python train.py --device 'cuda:7' --scene "drums" --limit_f
 python train.py --device 'cuda:8' --scene "drums" 
 python train.py --device 'cuda:9' --scene "drums" --use_exp
+
+python train.py --device 'cuda:7' --scene "drums" --sample 'prob'
+python train.py --device 'cuda:6' --scene "drums" --learnable_f --sample 'prob'
+
+
+python train.py --device 'cuda:9' --scene "drums" --learnable_f

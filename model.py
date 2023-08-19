@@ -5,11 +5,12 @@ from pose_utils import to8b
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, min_deg, max_deg):
+    def __init__(self, min_deg, max_deg, learnable_f=False):
         super(PositionalEncoding, self).__init__()
         self.min_deg = min_deg
         self.max_deg = max_deg
-        self.scales = nn.Parameter(torch.tensor([2 ** i for i in range(min_deg, max_deg)]), requires_grad=False)
+        self.scales = nn.Parameter(torch.tensor([(2**0.5) ** i for i in range(min_deg, max_deg)]), requires_grad=learnable_f)
+
 
     def forward(self, x, y=None):
         shape = list(x.shape[:-1]) + [-1]
@@ -72,7 +73,7 @@ class MipNeRF(nn.Module):
             self.density_activation = torch.exp
         else:
             self.density_activation = nn.Softplus()
-        self.positional_encoding = PositionalEncoding(min_deg, max_deg)
+        self.positional_encoding = PositionalEncoding(min_deg, max_deg, config.learnable_f)
         self.density_net0 = nn.Sequential(
             nn.Linear(self.density_input, hidden),
             nn.ReLU(True),
@@ -104,7 +105,7 @@ class MipNeRF(nn.Module):
             self.rgb_net0 = nn.Sequential(
                 nn.Linear(hidden, hidden)
             )
-            self.viewdirs_encoding = PositionalEncoding(viewdirs_min_deg, viewdirs_max_deg)
+            self.viewdirs_encoding = PositionalEncoding(viewdirs_min_deg, viewdirs_max_deg, config.learnable_f)
             self.rgb_net1 = nn.Sequential(
                 nn.Linear(hidden + self.rgb_input, num_samples),
                 nn.ReLU(True),

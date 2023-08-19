@@ -8,6 +8,8 @@ def get_config():
     config = argparse.ArgumentParser()
     # test fre
     config.add_argument("--limit_f", action="store_true")
+    config.add_argument("--learnable_f", action="store_true")
+    config.add_argument("--sample", type=str, default='normal', choices=['normal', 'prob'])
     # basic hyperparams to specify where to load/save data from/to
     config.add_argument("--version", type=int, default=0)
     config.add_argument("--log_dir", type=str, default="log")

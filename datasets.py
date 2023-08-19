@@ -1,6 +1,7 @@
 import os
 from os import path
 import json
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from PIL import Image
@@ -11,14 +12,14 @@ from pose_utils import normalize, look_at, poses_avg, recenter_poses, to_float, 
 from torch.utils.data import Dataset, DataLoader
 
 
-def get_dataset(dataset_name, base_dir, split, factor=4, device=torch.device("cpu"), config=None):
-    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device, config=config)
+def get_dataset(dataset_name, base_dir, split, factor=4, device=torch.device("cpu"), sample='normal'):
+    d = dataset_dict[dataset_name](base_dir, split, factor=factor, device=device, sample=sample)
     return d
 
 
 def get_dataloader(dataset_name, base_dir, split, factor=4, batch_size=None, shuffle=True, device=torch.device("cpu"),
-                   config=None):
-    d = get_dataset(dataset_name, base_dir, split, factor, device, config)
+                   sample='normal'):
+    d = get_dataset(dataset_name, base_dir, split, factor, device, sample)
     # make the batchsize height*width, so that one "batch" from the dataloader corresponds to one
     # image used to render a video, and don't shuffle dataset
     if split == "render":
@@ -40,7 +41,7 @@ def cycle(iterable):
 
 class NeRFDataset(Dataset):
     def __init__(self, base_dir, split, spherify=False, near=2, far=10, white_bkgd=False, factor=1, n_poses=120,
-                 radius=None, radii=None, h=None, w=None, device=torch.device("cpu")):
+                 radius=None, radii=None, h=None, w=None, device=torch.device("cpu"), sample='normal'):
         super(Dataset, self).__init__()
         self.base_dir = base_dir
         self.split = split
@@ -55,9 +56,11 @@ class NeRFDataset(Dataset):
         self.radii = radii
         self.h = h
         self.w = w
+        self.sample = sample
         self.device = device
         self.rays = None
         self.images = None
+        self.probs = None
         self.load()
 
     def load(self):
@@ -157,6 +160,12 @@ class NeRFDataset(Dataset):
             self.rays = namedtuple_map(lambda r: torch.tensor(r).float().reshape([-1, r.shape[-1]]), self.rays)
         if self.images is not None:
             self.images = torch.from_numpy(self.images.reshape([-1, 3]))
+        if self.probs is not None:
+            self.probs = torch.from_numpy(self.probs).reshape(-1, 1)
+        if self.sample == 'prob':
+            self.rays = self.rays._replace(lossmult=self.rays.lossmult+torch.log10(self.probs + 1))
+            self.probs = None
+
 
     def ray_to_device(self, rays):
         return namedtuple_map(lambda r: r.to(self.device), rays)
@@ -182,9 +191,10 @@ class Blender(NeRFDataset):
     """Blender Dataset."""
 
     def __init__(self, base_dir, split, factor=1, spherify=True, white_bkgd=True, near=2, far=6, radius=4, radii=1,
-                 h=800, w=800, device=torch.device("cpu"), config=None):
+                 h=800, w=800, device=torch.device("cpu"), sample='normal'):
         super(Blender, self).__init__(base_dir, split, factor=factor, spherify=spherify, near=near, far=far,
-                                      white_bkgd=white_bkgd, radius=radius, radii=radii, h=h, w=w, device=device)
+                                      white_bkgd=white_bkgd, radius=radius, radii=radii, h=h, w=w, device=device,
+                                      sample=sample)
 
     def generate_training_poses(self):
         """Load data from disk"""
@@ -193,6 +203,7 @@ class Blender(NeRFDataset):
             meta = json.load(fp)
         images = []
         cams = []
+        probs = []
         for i in range(len(meta['frames'])):
             frame = meta['frames'][i]
             fname = os.path.join(self.base_dir, frame['file_path'] + '.png')
@@ -202,8 +213,13 @@ class Blender(NeRFDataset):
                     [halfres_h, halfres_w] = [hw // 2 for hw in image.shape[:2]]
                     image = cv2.resize(
                         image, (halfres_w, halfres_h), interpolation=cv2.INTER_AREA)
+                blur_img = cv2.GaussianBlur(image, [5, 5], 0)
+                prob = np.sum((image - blur_img) ** 2, axis=-1, keepdims=True)
             cams.append(np.array(frame['transform_matrix'], dtype=np.float32))
             images.append(image)
+            probs.append(prob)
+
+        self.probs = np.stack(np.array(probs), axis=0)
         self.images = np.stack(np.array(images), axis=0)
         if self.white_bkgd:
             self.images = (
@@ -221,12 +237,12 @@ class Blender(NeRFDataset):
         """
         Generate arbitrary poses (views)
         """
-        with open(path.join(self.base_dir, 'transforms_{}.json'.format('test')), 'r') as fp:
+        with open(path.join(self.base_dir, 'transforms_{}.json'.format('val')), 'r') as fp:
             meta = json.load(fp)
         frame = meta['frames'][0]
         fname = os.path.join(self.base_dir, frame['file_path'] + '.png')
         with open(fname, 'rb') as imgin:
-            image = np.array(Image.open(imgin), dtype=np.float32) / 255.
+           image = np.array(Image.open(imgin), dtype=np.float32) / 255.
         self.h, self.w = image.shape[:2]
         self.h = self.h // self.factor
         self.w = self.w // self.factor
@@ -237,6 +253,7 @@ class Blender(NeRFDataset):
             self.generate_spherical_poses(self.n_poses)
         else:
             self.generate_spiral_poses(self.n_poses)
+
 
 
 class LLFF(NeRFDataset):
@@ -425,10 +442,9 @@ class LLFF(NeRFDataset):
 
 class nerf360(NeRFDataset):
     def __init__(self, base_dir, split, factor=4, spherify=True, near=None, far=None, white_bkgd=False,
-                 device=torch.device("cpu"), config=None):
-        self.config = config
+                 device=torch.device("cpu"), sample='normal'):
         super(nerf360, self).__init__(base_dir, split, spherify=spherify, near=near, far=far, white_bkgd=white_bkgd,
-                                      factor=factor, device=device)
+                                      factor=factor, device=device, sample=sample)
 
     def generate_training_poses(self):
         """Load data from disk"""
@@ -463,10 +479,7 @@ class nerf360(NeRFDataset):
         self.images = images
         bds = np.moveaxis(bds, -1, 0).astype(np.float32)
         # Rescale according to a default bd factor.
-        if self.config.norm == 'max':
-            scale = 1. / (bds.max() * .75)
-        else:
-            scale = 1. / (bds.min() * .75)
+        scale = 1. / (bds.min() * .75)
         poses[:, :3, 3] *= scale
         bds *= scale
         # Recenter poses.
