@@ -1,9 +1,12 @@
 limit_f False
+learnable_f True
+sample prob
+intensity True
 version 0
 log_dir log/blender/drums/version_1/
 dataset_name blender
 scene drums
-use_exp True
+use_exp False
 use_viewdirs True
 randomized True
 ray_shape cone
@@ -16,10 +19,10 @@ density_noise 0.0
 density_bias -1.0
 rgb_padding 0.001
 resample_padding 0.01
-min_deg 0
+min_deg -8
 max_deg 16
 viewdirs_min_deg 0
-viewdirs_max_deg 4
+viewdirs_max_deg 8
 coarse_weight_decay 0.1
 lr_init 0.001
 lr_final 5e-05

@@ -163,7 +163,7 @@ class NeRFDataset(Dataset):
         if self.probs is not None:
             self.probs = torch.from_numpy(self.probs).reshape(-1, 1)
         if self.sample == 'prob':
-            self.rays = self.rays._replace(lossmult=self.rays.lossmult+torch.log10(self.probs + 1))
+            self.rays = self.rays._replace(lossmult=self.rays.lossmult+torch.log10(2.5*self.probs + 2.5))
             self.probs = None
 
 

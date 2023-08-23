@@ -20,3 +20,5 @@ python train.py --device 'cuda:6' --scene "drums" --learnable_f --sample 'prob'
 
 python train.py --device 'cuda:9' --scene "drums" --learnable_f
 python visualize.py --device 'cuda:6' --scene "drums" --factor 4 --visualize_depth  --learnable_f --eval --version 6
+python eval.py --device 'cuda:6' --scene "drums" --visualize_depth --min_deg -8 --max_deg 16 --intensity --viewdirs_max_deg 8 --eval --version 8
+python eval.py --device 'cuda:7' --scene "drums"  --min_deg -8 --max_deg 16  --viewdirs_max_deg 8  --version 1 --eval --visualize_depth --intensity

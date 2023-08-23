@@ -9,8 +9,8 @@ class PositionalEncoding(nn.Module):
         super(PositionalEncoding, self).__init__()
         self.min_deg = min_deg
         self.max_deg = max_deg
-        self.scales = nn.Parameter(torch.tensor([(2**0.5) ** i for i in range(min_deg, max_deg)]), requires_grad=learnable_f)
-
+        self.scales = nn.Parameter(torch.tensor([(2 ** 0.5) ** i for i in range(min_deg, max_deg)]),
+                                   requires_grad=learnable_f)
 
     def forward(self, x, y=None):
         shape = list(x.shape[:-1]) + [-1]
@@ -110,6 +110,11 @@ class MipNeRF(nn.Module):
                 nn.Linear(hidden + self.rgb_input, num_samples),
                 nn.ReLU(True),
             )
+        if self.config.intensity:
+            self.intensity = nn.Sequential(
+                nn.Linear(input_shape, 1),
+                nn.Softplus()
+            )
         self.final_rgb = nn.Sequential(
             nn.Linear(input_shape, 3),
             nn.Sigmoid()
@@ -139,9 +144,11 @@ class MipNeRF(nn.Module):
             if self.config.limit_f:
                 dist = mean.detach().norm(dim=-1, keepdim=True).reshape(-1, 1) / 1.2
                 index = dist >= 1.
-                dist = 1/torch.exp((torch.cat([(dist-1) * i for i in range(self.config.max_deg)], dim=-1)).repeat_interleave(3, dim=-1))
-                dist = dist.repeat(1,2)
-                samples_enc = (samples_enc * index * dist).reshape(-1,self.density_input) + samples_enc * (~index)
+                dist = 1 / torch.exp(
+                    (torch.cat([(dist - 1) * i for i in range(self.config.max_deg)], dim=-1)).repeat_interleave(3,
+                                                                                                                dim=-1))
+                dist = dist.repeat(1, 2)
+                samples_enc = (samples_enc * index * dist).reshape(-1, self.density_input) + samples_enc * (~index)
             # predict density
             new_encodings = self.density_net0(samples_enc)
             new_encodings = torch.cat((new_encodings, samples_enc), -1)
@@ -158,7 +165,8 @@ class MipNeRF(nn.Module):
                 new_encodings = torch.cat((new_encodings, viewdirs), -1)
                 new_encodings = self.rgb_net1(new_encodings)
             raw_rgb = self.final_rgb(new_encodings).reshape((-1, self.num_samples, 3))
-
+            if self.config.intensity:            
+                intensity = self.intensity(new_encodings).reshape((-1, self.num_samples, 1))
             # Add noise to regularize the density predictions if needed.
             if self.randomized and self.density_noise:
                 raw_density += self.density_noise * torch.rand(raw_density.shape, dtype=raw_density.dtype,
@@ -167,6 +175,8 @@ class MipNeRF(nn.Module):
             # volumetric rendering
             rgb = raw_rgb * (1 + 2 * self.rgb_padding) - self.rgb_padding
             density = self.density_activation(raw_density + self.density_bias)
+            if self.config.intensity:
+                density = density * intensity
             comp_rgb, distance, acc, weights, alpha = volumetric_rendering(rgb, density, t_vals,
                                                                            rays.directions.to(rgb.device),
                                                                            self.white_bkgd)

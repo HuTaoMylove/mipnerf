@@ -1,1 +1,1 @@
-python eval.py --device 'cuda:6' --scene "drums" --visualize_depth  --eval --version 6
+python train.py --device 'cuda:7' --scene "drums" --learnable_f --min_deg -12 --max_deg 32  --viewdirs_max_deg 16 --num_levels 1 --hidden 128

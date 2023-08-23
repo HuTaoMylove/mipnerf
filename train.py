@@ -21,7 +21,7 @@ def train_model(config):
     best_path = path.join(config.log_dir, "best_ckpt.pt")
     data = iter(cycle(
         get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train", factor=config.factor,
-                       batch_size=config.batch_size, shuffle=True, device=config.device)))
+                       batch_size=config.batch_size, shuffle=True, device=config.device, sample=config.sample)))
     eval_data = None
     if config.do_eval:
         eval_data = iter(cycle(get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="test",
@@ -57,11 +57,6 @@ def train_model(config):
         optimizer.load_state_dict(ckpt['optim'])
         scheduler.last_epoch = ckpt['epoch']
         best_psnr = ckpt['best_psnr']
-        if ckpt['epoch'] >= 20_000 and config.sample == 'prob':
-            data = iter(cycle(
-                get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train",
-                               factor=config.factor,
-                               batch_size=config.batch_size, shuffle=True, device=config.device, sample=config.sample)))
     loss_func = NeRFLoss(config.coarse_weight_decay)
     model.train()
     os.makedirs(config.log_dir, exist_ok=True)
@@ -81,14 +76,9 @@ def train_model(config):
 
         psnr = psnr.detach().cpu().numpy()
         logger.add_scalar('train/loss', float(loss_val.detach().cpu().numpy()), global_step=step)
-        logger.add_scalar('train/coarse_psnr', float(np.mean(psnr[:-1])), global_step=step)
+        logger.add_scalar('train/coarse_psnr', float(np.sum(psnr[:-1])), global_step=step)
         logger.add_scalar('train/fine_psnr', float(psnr[-1]), global_step=step)
         logger.add_scalar('train/lr', float(scheduler.get_last_lr()[-1]), global_step=step)
-        if step == 20_000 and config.sample == 'prob':
-            data = iter(cycle(
-                get_dataloader(dataset_name=config.dataset_name, base_dir=config.base_dir, split="train",
-                               factor=config.factor,
-                               batch_size=config.batch_size, shuffle=True, device=config.device, sample=config.sample)))
         if step % config.save_every == 0:
             if eval_data:
                 del rays
@@ -97,8 +87,8 @@ def train_model(config):
                 for i in range(10):
                     psnr = eval_model(config, model, eval_data)
                     psnr = psnr.detach().cpu().numpy()
-                    psnr_sum_c += psnr[0]
-                    psnr_sum_r += psnr[1]
+                    psnr_sum_c += np.sum(psnr[:-1])
+                    psnr_sum_r += psnr[-1]
                 psnr_sum_c /= 10
                 psnr_sum_r /= 10
                 logger.add_scalar('eval/coarse_psnr', float(psnr_sum_c), global_step=step)
